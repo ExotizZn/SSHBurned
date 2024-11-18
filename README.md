@@ -1,8 +1,18 @@
 # Writeup - SSHBurned
+> It's a disaster, the private key allowing to connect to all the machines leaked on the DW, fortunately we don't risk anything because it is not complete !
+## A propos du challenge
+On a une capture d'écran d'une clé RSA privée, sauf qu'il y a des parties cachées/effacées. Voici à quoi ressemble la capture d'écran :
+
+![SSHBurned](burned_key.png)
+
+## Comment résoudre ce challenge ?
+Notre objectif est de reconstruire la clé à partir des données de la capture d'écran, pour ensuite accéder au serveur et récupérer le flag.
+Pour reconstuire la clé il nous faut retrouver ces paramètres : N, e, d, p, et q
+En analysant petit à petit, nous allons réussir à récupérer tous ces paramètres.
 
 ## OCR (Optical Character Recognition)
 
-Le premier problème est de retranscrire ce qu'il y a sur l'image sous forme de texte, pour cela on peut utiliser un OCR pour avoir une transcription presque parfaite. Avec le premier OCR trouvé sur internet, le résultat n'était pas parfait il fallait donc vérifier que tous les caractères correspondait bien à l'image. Voici ce qu'on obtient :
+Le premier problème est de transcrire ce qu'il y a sur l'image sous forme de texte, pour cela on peut utiliser un [OCR(wiki)](https://fr.wikipedia.org/wiki/Reconnaissance_optique_de_caract%C3%A8res) pour avoir une transcription presque parfaite. Avec le premier [OCR](https://www.imagetotext.info/) trouvé sur internet, le résultat n'était pas parfait, il fallait donc vérifier que tous les caractères correspondaient bien à l'image. Voici ce qu'on obtient :
 
 ```         
 -----BEGIN RSA PRIVATE KEY-----
@@ -55,12 +65,12 @@ RSAPrivateKey ::= SEQUENCE {
 }
 ```
 
-Pour retrouver ces informations, on décode en base64 puis on encode en hexadécimal, pour cela on peut utiliser [CyberChief](%22https://gchq.github.io/CyberChef/%22) en utilisant la "recette" suivante : 
+Pour retrouver ces informations, on décode en base64 puis on encode en hexadécimal, on peut utiliser [CyberChief](https://gchq.github.io/CyberChef/) en utilisant la "recette" suivante : 
 - Remove whitespace
 - From base64
 - To hex (Delimiter: none;  Bytes per line: 48)
 
-En arrengeant un peu ça nous donne :
+En arrengeant un peu, ça nous donne :
 ```
 -----BEGIN RSA PRIVATE KEY-----
 3082092a0201000282020100bd387087f686874f6e345a2317dc3eec24ab0ccf6a412a05e5f1040b374b7207be50a014
@@ -83,10 +93,10 @@ e99cbe9bee7fac59eecfa752232f4ff22a292ae2e75e6a36ad9f02820100056d864db21a6071724c
 [                                         Burned! (x5)                                         ]
 -----END RSA PRIVATE KEY-----
 ``` 
-Les données qu'on cherche commence toujours par : **02820101**
-- **02**, pour le type de données, ici un Integer (entier).
-- **82**, pour nous indiquer que les deux prochains bytes nous indique la taille de l'entier.
-- **0101**, la taille de l'entier, 257 bytes
+Les données qu'on cherche commencent toujours par : $${\color{orange}02820101}$$
+- $${\color{orange}02}$$, pour le type de données, ici un Integer (entier).
+- $${\color{orange}82}$$, pour nous indiquer que les deux prochains bytes nous indique la taille de l'entier.
+- $${\color{orange}0101}$$, la taille de l'entier, **257 bytes**
 Pour savoir où sont ces données par rapport à une vraie clé on peut générer nouvelle une clé de 4096 bit et la comparer avec celle ci.
 
 ### Récuperer les données lisibles
@@ -98,9 +108,9 @@ q_upper_bits = 0xd0ec529444a3a18ebd58be52c9d3983fc0b95299f01e044528d3c5f92533a7e
 p  = 0xe7db92db07f3385887095316d266e760baa2b9e6cb0f267a4ba17d8c94143726b1338e47de16a15d137324b5e58591908da3aae0ad6a6bce480736a94d04420c749f2d46a2a00f6cee58e33d515a06f67842bb1a1584a17ab355efd1875d9b2aede3458fff0f7204b7a327c6ffc01a72c898819667ed6972ecec5a9204c3f4fcd57efd78182440697b9b6e3c9cbf7b18273f7582af95e245964e1079c0f002c98b45e947bff437412b7cf3beb9d5d84feeab79af41d8894d310add8ffc5eba5d2d915efbc7485b6dd038c7730360278a6d796ae5a5bfafa8119d29a2705889ad2c5aa4933f7f626446a1e84f7ca7050ed92a0ac020ea2b980b9d6f9af9325be5
 dq = 0xa3b81dba5cd391be06b96d63f90f1ca71102e92d02d2b2ebf363892785b4a6250940e5f4503a29205771772121d2f6f4ea36ee8728c83098e25bd58087e424a3c9f0da26eae6fcdbb1acba1bf756b8793c7c3b41cba43458cb2e8f5db7fadd5eb42e0fd563a7e9e8da0bf9438a9b9f5578627bd94ee539eeb40de7dac5d4a213e7d13bd3a7a4f9a11d05127406ecc00ae3aa8db7234ff892b33c3873adf38d1d1b62dc979be37bc458b16af30fa311d08d85035da19333e76353e9f9f0c47d5dec83f0322e5fb10026bf002a613b28b3243672b3f6de8466b3bfa08e071dac8f6065acc4fdf2e99cbe9bee7fac59eecfa752232f4ff22a292ae2e75e6a36ad9f
 ```
-Sachant que nous avons dq et p en entier nous pouvons reconstruire la clé entièrement !
+Sachant que nous avons **dq** et **p** en entier nous pouvons reconstruire la clé entièrement !
 ### Retrouver q
-<ins>On sait que :</ins></br>
+On sait que :</br>
 $$e\times d = 1 \pmod{\Phi} \Rightarrow e\times dq = 1 \pmod{q-1} \Rightarrow e\times dq = 1 + k_p(p - 1) \Rightarrow q = \frac{e\times dp - 1}{k_p} + 1$$ </br>
 la seule inconnue étant $k_p$. En utilisant Python, on trouve un nombre premier (q) assez rapidement :
 ```python
